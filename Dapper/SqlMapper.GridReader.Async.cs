@@ -17,7 +17,7 @@ namespace Dapper
 #endif
         {
             private readonly CancellationToken cancel;
-            internal GridReader(IDbCommand command, DbDataReader reader, Identity identity, DynamicParameters dynamicParams, bool addToCache, CancellationToken cancel)
+            internal GridReader(IDbCommand command, DbDataReader reader, Identity identity, DynamicParameters? dynamicParams, bool addToCache, CancellationToken cancel)
                 : this(command, reader, identity, dynamicParams, addToCache)
             {
                 this.cancel = cancel;
@@ -143,7 +143,11 @@ namespace Dapper
 
             private async Task NextResultAsync()
             {
-                if (await reader.NextResultAsync(cancel).ConfigureAwait(false))
+                if (reader is null)
+                {
+                    // nothing to do
+                }
+                else if (await reader.NextResultAsync(cancel).ConfigureAwait(false))
                 {
                     // readCount++;
                     gridIndex++;
@@ -178,7 +182,7 @@ namespace Dapper
                 else
                 {
                     var result = ReadDeferred<T>(gridIndex, deserializer, type);
-                    if (buffered) result = result?.ToList(); // for the "not a DbDataReader" scenario
+                    if (buffered) result = result.ToList(); // for the "not a DbDataReader" scenario
                     return Task.FromResult(result);
                 }
             }
@@ -207,7 +211,7 @@ namespace Dapper
                 if (IsConsumed) throw new InvalidOperationException("Query results must be consumed in the correct order, and each result can only be consumed once");
 
                 IsConsumed = true;
-                T result = default;
+                T result = default!;
                 if (await reader.ReadAsync(cancel).ConfigureAwait(false) && reader.FieldCount != 0)
                 {
                     var typedIdentity = identity.ForGrid(type, gridIndex);
@@ -239,7 +243,7 @@ namespace Dapper
                 try
                 {
                     var buffer = new List<T>();
-                    while (index == gridIndex && await reader.ReadAsync(cancel).ConfigureAwait(false))
+                    while (index == gridIndex && await reader!.ReadAsync(cancel).ConfigureAwait(false))
                     {
                         buffer.Add(ConvertTo<T>(deserializer(reader)));
                     }
@@ -271,7 +275,7 @@ namespace Dapper
             {
                 try
                 {
-                    while (index == gridIndex && await reader.ReadAsync(cancel).ConfigureAwait(false))
+                    while (index == gridIndex && await reader!.ReadAsync(cancel).ConfigureAwait(false))
                     {
                         yield return ConvertTo<T>(deserializer(reader));
                     }

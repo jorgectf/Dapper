@@ -13,7 +13,7 @@ namespace Dapper
         /// <typeparam name="TValue">The value type of the cache.</typeparam>
         internal class Link<TKey, TValue> where TKey : class
         {
-            public static bool TryGet(Link<TKey, TValue> link, TKey key, out TValue value)
+            public static bool TryGet(Link<TKey, TValue>? link, TKey key, out TValue value)
             {
                 while (link != null)
                 {
@@ -24,11 +24,11 @@ namespace Dapper
                     }
                     link = link.Tail;
                 }
-                value = default;
+                value = default!;
                 return false;
             }
 
-            public static bool TryAdd(ref Link<TKey, TValue> head, TKey key, ref TValue value)
+            public static bool TryAdd(ref Link<TKey, TValue>? head, TKey key, ref TValue value)
             {
                 bool tryAgain;
                 do
@@ -46,7 +46,7 @@ namespace Dapper
                 return true;
             }
 
-            private Link(TKey key, TValue value, Link<TKey, TValue> tail)
+            private Link(TKey key, TValue value, Link<TKey, TValue>? tail)
             {
                 Key = key;
                 Value = value;
@@ -55,7 +55,7 @@ namespace Dapper
 
             public TKey Key { get; }
             public TValue Value { get; }
-            public Link<TKey, TValue> Tail { get; }
+            public Link<TKey, TValue>? Tail { get; }
         }
     }
 }

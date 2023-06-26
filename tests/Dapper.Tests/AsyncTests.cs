@@ -34,7 +34,7 @@ namespace Dapper.Tests
 
     public abstract class AsyncTests<TProvider> : TestBase<TProvider> where TProvider : SqlServerDatabaseProvider
     {
-        private DbConnection _marsConnection;
+        private DbConnection? _marsConnection;
 
         private DbConnection MarsConnection => _marsConnection ??= Provider.GetOpenConnection(true);
 
@@ -164,7 +164,7 @@ namespace Dapper.Tests
         public async Task TestBasicStringUsageQueryFirstOrDefaultAsyncDynamic()
         {
             var str = await connection.QueryFirstOrDefaultAsync("select null as [Value] union all select @txt", new { txt = "def" }).ConfigureAwait(false);
-            Assert.Null(str.Value);
+            Assert.Null(str!.Value);
         }
 
         [Fact]
@@ -191,7 +191,7 @@ namespace Dapper.Tests
         [Fact]
         public async Task TestBasicStringUsageQuerySingleOrDefaultAsyncDynamic()
         {
-            var str = await connection.QuerySingleOrDefaultAsync("select null as [Value]").ConfigureAwait(false);
+            var str = (await connection.QuerySingleOrDefaultAsync("select null as [Value]").ConfigureAwait(false))!;
             Assert.Null(str.Value);
         }
 
@@ -217,7 +217,7 @@ namespace Dapper.Tests
             }
             catch (AggregateException agg)
             {
-                Assert.True(agg.InnerException.GetType().Name == "SqlException");
+                Assert.True(agg.InnerException!.GetType().Name == "SqlException");
             }
         }
 
@@ -280,8 +280,8 @@ namespace Dapper.Tests
             // assertions
             Assert.Equal(1, product.Id);
             Assert.Equal("abc", product.Name);
-            Assert.Equal(2, product.Category.Id);
-            Assert.Equal("def", product.Category.Name);
+            Assert.Equal(2, product.Category?.Id);
+            Assert.Equal("def", product.Category?.Name);
         }
 
         [Fact]
@@ -299,8 +299,8 @@ namespace Dapper.Tests
             // assertions
             Assert.Equal(1, product.Id);
             Assert.Equal("abc", product.Name);
-            Assert.Equal(2, product.Category.Id);
-            Assert.Equal("def", product.Category.Name);
+            Assert.Equal(2, product.Category?.Id);
+            Assert.Equal("def", product.Category?.Name);
         }
 
         [Fact]
@@ -319,8 +319,8 @@ namespace Dapper.Tests
                 // assertions
                 Assert.Equal(1, product.Id);
                 Assert.Equal("abc", product.Name);
-                Assert.Equal(2, product.Category.Id);
-                Assert.Equal("def", product.Category.Name);
+                Assert.Equal(2, product.Category?.Id);
+                Assert.Equal("def", product.Category?.Name);
             }
         }
 
@@ -521,7 +521,7 @@ namespace Dapper.Tests
 
         private class BasicType
         {
-            public string Value { get; set; }
+            public string? Value { get; set; }
         }
 
         [Fact]
@@ -529,7 +529,7 @@ namespace Dapper.Tests
         {
             Type type = Common.GetSomeType();
 
-            dynamic actual = (await MarsConnection.QueryAsync(type, "select @A as [A], @B as [B]", new { A = 123, B = "abc" }).ConfigureAwait(false)).FirstOrDefault();
+            dynamic actual = (await MarsConnection.QueryAsync(type, "select @A as [A], @B as [B]", new { A = 123, B = "abc" }).ConfigureAwait(false)).FirstOrDefault()!;
             Assert.Equal(((object)actual).GetType(), type);
             int a = actual.A;
             string b = actual.B;
@@ -542,7 +542,7 @@ namespace Dapper.Tests
         {
             Type type = Common.GetSomeType();
 
-            dynamic actual = await MarsConnection.QueryFirstOrDefaultAsync(type, "select @A as [A], @B as [B]", new { A = 123, B = "abc" }).ConfigureAwait(false);
+            dynamic actual = (await MarsConnection.QueryFirstOrDefaultAsync(type, "select @A as [A], @B as [B]", new { A = 123, B = "abc" }).ConfigureAwait(false))!;
             Assert.Equal(((object)actual).GetType(), type);
             int a = actual.A;
             string b = actual.B;
@@ -586,9 +586,9 @@ namespace Dapper.Tests
                 p.Output(bob, b => b.PersonId);
                 p.Output(bob, b => b.Occupation);
                 p.Output(bob, b => b.NumberOfLegs);
-                p.Output(bob, b => b.Address.Name);
-                p.Output(bob, b => b.Address.PersonId);
-                p.Output(bob, b => b.Address.Index.Id);
+                p.Output(bob, b => b.Address!.Name);
+                p.Output(bob, b => b.Address!.PersonId);
+                p.Output(bob, b => b.Address!.Index!.Id);
 
                 await connection.ExecuteAsync(@"
 SET @Occupation = 'grillmaster' 
@@ -616,8 +616,8 @@ SET @AddressIndexId = '01088'", p).ConfigureAwait(false);
             p.Output(bob, b => b.PersonId);
             p.Output(bob, b => b.Occupation);
             p.Output(bob, b => b.NumberOfLegs);
-            p.Output(bob, b => b.Address.Name);
-            p.Output(bob, b => b.Address.PersonId);
+            p.Output(bob, b => b.Address!.Name);
+            p.Output(bob, b => b.Address!.PersonId);
 
             var result = (int)(await connection.ExecuteScalarAsync(@"
 SET @Occupation = 'grillmaster' 
@@ -625,7 +625,7 @@ SET @PersonId = @PersonId + 1
 SET @NumberOfLegs = @NumberOfLegs - 1
 SET @AddressName = 'bobs burgers'
 SET @AddressPersonId = @PersonId
-select 42", p).ConfigureAwait(false));
+select 42", p).ConfigureAwait(false))!;
 
             Assert.Equal("grillmaster", bob.Occupation);
             Assert.Equal(2, bob.PersonId);
@@ -644,8 +644,8 @@ select 42", p).ConfigureAwait(false));
             p.Output(bob, b => b.PersonId);
             p.Output(bob, b => b.Occupation);
             p.Output(bob, b => b.NumberOfLegs);
-            p.Output(bob, b => b.Address.Name);
-            p.Output(bob, b => b.Address.PersonId);
+            p.Output(bob, b => b.Address!.Name);
+            p.Output(bob, b => b.Address!.PersonId);
 
             var result = (await connection.QueryAsync<int>(@"
 SET @Occupation = 'grillmaster' 
@@ -672,8 +672,8 @@ select 42", p).ConfigureAwait(false)).Single();
             p.Output(bob, b => b.PersonId);
             p.Output(bob, b => b.Occupation);
             p.Output(bob, b => b.NumberOfLegs);
-            p.Output(bob, b => b.Address.Name);
-            p.Output(bob, b => b.Address.PersonId);
+            p.Output(bob, b => b.Address!.Name);
+            p.Output(bob, b => b.Address!.PersonId);
 
             var result = (await connection.QueryAsync<int>(new CommandDefinition(@"
 SET @Occupation = 'grillmaster' 
@@ -700,8 +700,8 @@ select 42", p, flags: CommandFlags.Buffered)).ConfigureAwait(false)).Single();
             p.Output(bob, b => b.PersonId);
             p.Output(bob, b => b.Occupation);
             p.Output(bob, b => b.NumberOfLegs);
-            p.Output(bob, b => b.Address.Name);
-            p.Output(bob, b => b.Address.PersonId);
+            p.Output(bob, b => b.Address!.Name);
+            p.Output(bob, b => b.Address!.PersonId);
 
             var result = (await connection.QueryAsync<int>(new CommandDefinition(@"
 SET @Occupation = 'grillmaster' 
@@ -728,8 +728,8 @@ select 42", p, flags: CommandFlags.None)).ConfigureAwait(false)).Single();
             p.Output(bob, b => b.PersonId);
             p.Output(bob, b => b.Occupation);
             p.Output(bob, b => b.NumberOfLegs);
-            p.Output(bob, b => b.Address.Name);
-            p.Output(bob, b => b.Address.PersonId);
+            p.Output(bob, b => b.Address!.Name);
+            p.Output(bob, b => b.Address!.PersonId);
 
             int x, y;
             using (var multi = await connection.QueryMultipleAsync(@"
@@ -788,11 +788,11 @@ SET @AddressPersonId = @PersonId", p).ConfigureAwait(false))
             await connection.ExecuteAsync("create table #dog(Age int, Name nvarchar(max)) insert #dog values(1, 'Alf')").ConfigureAwait(false);
             try
             {
-                var d = await connection.QueryFirstOrDefaultAsync<Dog>("select * from #dog").ConfigureAwait(false);
+                var d = (await connection.QueryFirstOrDefaultAsync<Dog>("select * from #dog").ConfigureAwait(false))!;
                 Assert.Equal("Alf", d.Name);
                 Assert.Equal(1, d.Age);
                 connection.Execute("alter table #dog drop column Name");
-                d = await connection.QueryFirstOrDefaultAsync<Dog>("select * from #dog").ConfigureAwait(false);
+                d = (await connection.QueryFirstOrDefaultAsync<Dog>("select * from #dog").ConfigureAwait(false))!;
                 Assert.Null(d.Name);
                 Assert.Equal(1, d.Age);
             }
@@ -863,15 +863,15 @@ SET @AddressPersonId = @PersonId", p).ConfigureAwait(false))
                 var p = data[0];
                 Assert.Equal(1, p.Id);
                 Assert.Equal("Review Board 1", p.Name);
-                Assert.Equal(1, p.User1.Id);
-                Assert.Equal(2, p.User2.Id);
-                Assert.Equal(3, p.User3.Id);
-                Assert.Equal(4, p.User4.Id);
-                Assert.Equal(5, p.User5.Id);
-                Assert.Equal(6, p.User6.Id);
-                Assert.Equal(7, p.User7.Id);
-                Assert.Equal(8, p.User8.Id);
-                Assert.Equal(9, p.User9.Id);
+                Assert.Equal(1, p.User1!.Id);
+                Assert.Equal(2, p.User2!.Id);
+                Assert.Equal(3, p.User3!.Id);
+                Assert.Equal(4, p.User4!.Id);
+                Assert.Equal(5, p.User5!.Id);
+                Assert.Equal(6, p.User6!.Id);
+                Assert.Equal(7, p.User7!.Id);
+                Assert.Equal(8, p.User8!.Id);
+                Assert.Equal(9, p.User9!.Id);
                 Assert.Equal("User 1", p.User1.Name);
                 Assert.Equal("User 2", p.User2.Name);
                 Assert.Equal("User 3", p.User3.Name);
@@ -944,7 +944,7 @@ SET @AddressPersonId = @PersonId", p).ConfigureAwait(false))
     {
         private readonly ITestOutputHelper _log;
         public AsyncQueryCacheTests(ITestOutputHelper log) => _log = log;
-        private DbConnection _marsConnection;
+        private DbConnection? _marsConnection;
         private DbConnection MarsConnection => _marsConnection ??= Provider.GetOpenConnection(true);
 
         public override void Dispose()

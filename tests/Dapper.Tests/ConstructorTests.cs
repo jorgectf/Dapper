@@ -132,6 +132,7 @@ SELECT * FROM @ExplicitConstructors"
         {
             public MultipleConstructors()
             {
+                B = default!;
             }
 
             public MultipleConstructors(int a, string b)
@@ -157,7 +158,7 @@ SELECT * FROM @ExplicitConstructors"
             }
 
             public int A { get; set; }
-            public string B { get; set; }
+            public string? B { get; set; }
         }
 
         private class NoDefaultConstructor

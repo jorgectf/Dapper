@@ -69,7 +69,7 @@ namespace Dapper.Tests
             public Car.TrapEnum Trap { get; init; }
         }
 
-        private record PositionalCarRecord(int Age, Car.TrapEnum Trap, string Name)
+        private record PositionalCarRecord(int Age, Car.TrapEnum Trap, string? Name)
         {
             public PositionalCarRecord() : this(default, default, default) { }
         }
@@ -78,7 +78,7 @@ namespace Dapper.Tests
         {
             public int Age { get; init; }
             public Car.TrapEnum Trap { get; init; }
-            public string Name { get; init; }
+            public string? Name { get; init; }
         }
 
         [Fact]
@@ -161,11 +161,11 @@ namespace Dapper.Tests
             connection.Execute("create table #dog(Age int, Name nvarchar(max)) insert #dog values(1, 'Alf')");
             try
             {
-                var d = connection.QueryFirstOrDefault<Dog>("select * from #dog");
+                var d = connection.QueryFirstOrDefault<Dog>("select * from #dog")!;
                 Assert.Equal("Alf", d.Name);
                 Assert.Equal(1, d.Age);
                 connection.Execute("alter table #dog drop column Name");
-                d = connection.QueryFirstOrDefault<Dog>("select * from #dog");
+                d = connection.QueryFirstOrDefault<Dog>("select * from #dog")!;
                 Assert.Null(d.Name);
                 Assert.Equal(1, d.Age);
             }
@@ -416,7 +416,7 @@ insert #users16726709 values ('Fred','Bloggs') insert #users16726709 values ('To
 
         private class Student
         {
-            public string Name { get; set; }
+            public string? Name { get; set; }
             public int Age { get; set; }
         }
 
@@ -600,14 +600,14 @@ select * from @bar", new { foo }).Single();
 
         private class InheritanceTest1
         {
-            public string Base1 { get; set; }
-            public string Base2 { get; private set; }
+            public string? Base1 { get; set; }
+            public string? Base2 { get; private set; }
         }
 
         private class InheritanceTest2 : InheritanceTest1
         {
-            public string Derived1 { get; set; }
-            public string Derived2 { get; private set; }
+            public string? Derived1 { get; set; }
+            public string? Derived2 { get; private set; }
         }
 
         [Fact]
@@ -694,7 +694,7 @@ select * from @bar", new { foo }).Single();
         [Fact]
         public void TestFastExpandoSupportsIDictionary()
         {
-            var row = connection.Query("select 1 A, 'two' B").First() as IDictionary<string, object>;
+            var row = (connection.Query("select 1 A, 'two' B").First() as IDictionary<string, object>)!;
             Assert.Equal(1, row["A"]);
             Assert.Equal("two", row["B"]);
         }
@@ -704,7 +704,7 @@ select * from @bar", new { foo }).Single();
         {
             Assert.Equal(1, connection.Query<PrivateDan>("select 'one' ShadowInDB").First().Shadow);
 
-            Assert.Equal(1, connection.QueryFirstOrDefault<PrivateDan>("select 'one' ShadowInDB").Shadow);
+            Assert.Equal(1, connection.QueryFirstOrDefault<PrivateDan>("select 'one' ShadowInDB")?.Shadow);
         }
 
         private class PrivateDan
@@ -719,7 +719,7 @@ select * from @bar", new { foo }).Single();
         [Fact]
         public void TestUnexpectedDataMessage()
         {
-            string msg = null;
+            string? msg = null;
             try
             {
                 connection.Query<int>("select count(1) where 1 = @Foo", new WithBizarreData { Foo = new GenericUriParser(GenericUriParserOptions.Default), Bar = 23 }).First();
@@ -741,7 +741,7 @@ select * from @bar", new { foo }).Single();
 
         private class WithBizarreData
         {
-            public GenericUriParser Foo { get; set; }
+            public GenericUriParser? Foo { get; set; }
             public int Bar { get; set; }
         }
 
@@ -983,7 +983,7 @@ select * from @bar", new { foo }).Single();
                 "SELECT 1 Id, 'Mr' Title, 'John' Surname, 4 AddressCount",
                 (person, addressCount) => person,
                 splitOn: "AddressCount"
-            ).FirstOrDefault();
+            ).FirstOrDefault()!;
 
             var asDict = (IDictionary<string, object>)results;
 
@@ -1060,7 +1060,7 @@ select * from @bar", new { foo }).Single();
         {
             Type type = Common.GetSomeType();
 
-            dynamic template = Activator.CreateInstance(type);
+            dynamic template = Activator.CreateInstance(type)!;
             dynamic actual = CheetViaDynamic(template, "select @A as [A], @B as [B]", new { A = 123, B = "abc" });
             Assert.Equal(((object)actual).GetType(), type);
             int a = actual.A;
@@ -1074,7 +1074,7 @@ select * from @bar", new { foo }).Single();
         {
             Type type = Common.GetSomeType();
 
-            dynamic actual = connection.Query(type, "select @A as [A], @B as [B]", new { A = 123, B = "abc" }).FirstOrDefault();
+            dynamic actual = connection.Query(type, "select @A as [A], @B as [B]", new { A = 123, B = "abc" }).FirstOrDefault()!;
             Assert.Equal(((object)actual).GetType(), type);
             int a = actual.A;
             string b = actual.B;
@@ -1084,7 +1084,7 @@ select * from @bar", new { foo }).Single();
 
         private T CheetViaDynamic<T>(T template, string query, object args)
         {
-            return connection.Query<T>(query, args).SingleOrDefault();
+            return connection.Query<T>(query, args).SingleOrDefault()!;
         }
 
         [Fact]

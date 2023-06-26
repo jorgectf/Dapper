@@ -15,11 +15,11 @@ namespace Dapper
         /// </summary>
         public partial class GridReader : IDisposable
         {
-            private DbDataReader reader;
+            private DbDataReader? reader;
             private readonly Identity identity;
             private readonly bool addToCache;
 
-            internal GridReader(IDbCommand command, DbDataReader reader, Identity identity, IParameterCallbacks callbacks, bool addToCache)
+            internal GridReader(IDbCommand command, DbDataReader reader, Identity identity, IParameterCallbacks? callbacks, bool addToCache)
             {
                 Command = command;
                 this.reader = reader;
@@ -162,7 +162,7 @@ namespace Dapper
                 }
                 IsConsumed = true;
                 var result = ReadDeferred<T>(gridIndex, deserializer.Func, type);
-                return buffered ? result?.ToList() : result;
+                return buffered ? result.ToList() : result;
             }
 
             private T ReadRow<T>(Type type, Row row)
@@ -171,7 +171,7 @@ namespace Dapper
                 if (IsConsumed) throw new InvalidOperationException("Query results must be consumed in the correct order, and each result can only be consumed once");
                 IsConsumed = true;
 
-                T result = default;
+                T result = default!;
                 if (reader.Read() && reader.FieldCount != 0)
                 {
                     var typedIdentity = identity.ForGrid(type, gridIndex);
@@ -356,7 +356,7 @@ namespace Dapper
             {
                 try
                 {
-                    while (index == gridIndex && reader.Read())
+                    while (index == gridIndex && reader?.Read() == true)
                     {
                         yield return ConvertTo<T>(deserializer(reader));
                     }
@@ -371,7 +371,7 @@ namespace Dapper
             }
 
             private int gridIndex; //, readCount;
-            private readonly IParameterCallbacks callbacks;
+            private readonly IParameterCallbacks? callbacks;
 
             /// <summary>
             /// Has the underlying reader been consumed?
@@ -381,11 +381,15 @@ namespace Dapper
             /// <summary>
             /// The command associated with the reader
             /// </summary>
-            public IDbCommand Command { get; set; }
+            public IDbCommand? Command { get; set; }
 
             private void NextResult()
             {
-                if (reader.NextResult())
+                if (reader is null)
+                {
+                    // nothing to do
+                }
+                else if (reader.NextResult())
                 {
                     // readCount++;
                     gridIndex++;
@@ -422,10 +426,10 @@ namespace Dapper
             }
 
             [MethodImpl(MethodImplOptions.AggressiveInlining)]
-            private static T ConvertTo<T>(object value) => value switch
+            private static T ConvertTo<T>(object? value) => value switch
             {
                 T typed => typed,
-                null or DBNull => default,
+                null or DBNull => default!,
                 _ => (T)Convert.ChangeType(value, Nullable.GetUnderlyingType(typeof(T)) ?? typeof(T), CultureInfo.InvariantCulture),
             };
         }
