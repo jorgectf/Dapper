@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Data;
 using System.Data.Common;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -16,13 +15,6 @@ namespace Dapper
             : IAsyncDisposable
 #endif
         {
-            private readonly CancellationToken cancel;
-            internal GridReader(IDbCommand command, DbDataReader reader, Identity identity, DynamicParameters? dynamicParams, bool addToCache, CancellationToken cancel)
-                : this(command, reader, identity, dynamicParams, addToCache)
-            {
-                this.cancel = cancel;
-            }
-
             /// <summary>
             /// Read the next grid of results, returned as a dynamic object
             /// </summary>
@@ -40,7 +32,7 @@ namespace Dapper
             /// Read an individual row of the next grid of results, returned as a dynamic object
             /// </summary>
             /// <remarks>Note: the row can be accessed via "dynamic", or by casting to an IDictionary&lt;string,object&gt;</remarks>
-            public Task<dynamic> ReadFirstOrDefaultAsync() => ReadRowAsyncImpl<dynamic>(typeof(DapperRow), Row.FirstOrDefault);
+            public Task<dynamic?> ReadFirstOrDefaultAsync() => ReadRowAsyncImpl<dynamic?>(typeof(DapperRow), Row.FirstOrDefault);
 
             /// <summary>
             /// Read an individual row of the next grid of results, returned as a dynamic object
@@ -52,7 +44,7 @@ namespace Dapper
             /// Read an individual row of the next grid of results, returned as a dynamic object
             /// </summary>
             /// <remarks>Note: the row can be accessed via "dynamic", or by casting to an IDictionary&lt;string,object&gt;</remarks>
-            public Task<dynamic> ReadSingleOrDefaultAsync() => ReadRowAsyncImpl<dynamic>(typeof(DapperRow), Row.SingleOrDefault);
+            public Task<dynamic?> ReadSingleOrDefaultAsync() => ReadRowAsyncImpl<dynamic?>(typeof(DapperRow), Row.SingleOrDefault);
 
             /// <summary>
             /// Read the next grid of results
@@ -82,10 +74,10 @@ namespace Dapper
             /// </summary>
             /// <param name="type">The type to read.</param>
             /// <exception cref="ArgumentNullException"><paramref name="type"/> is <c>null</c>.</exception>
-            public Task<object> ReadFirstOrDefaultAsync(Type type)
+            public Task<object?> ReadFirstOrDefaultAsync(Type type)
             {
                 if (type == null) throw new ArgumentNullException(nameof(type));
-                return ReadRowAsyncImpl<object>(type, Row.FirstOrDefault);
+                return ReadRowAsyncImpl<object?>(type, Row.FirstOrDefault);
             }
 
             /// <summary>
@@ -104,10 +96,10 @@ namespace Dapper
             /// </summary>
             /// <param name="type">The type to read.</param>
             /// <exception cref="ArgumentNullException"><paramref name="type"/> is <c>null</c>.</exception>
-            public Task<object> ReadSingleOrDefaultAsync(Type type)
+            public Task<object?> ReadSingleOrDefaultAsync(Type type)
             {
                 if (type == null) throw new ArgumentNullException(nameof(type));
-                return ReadRowAsyncImpl<object>(type, Row.SingleOrDefault);
+                return ReadRowAsyncImpl<object?>(type, Row.SingleOrDefault);
             }
 
             /// <summary>
@@ -127,7 +119,7 @@ namespace Dapper
             /// Read an individual row of the next grid of results.
             /// </summary>
             /// <typeparam name="T">The type to read.</typeparam>
-            public Task<T> ReadFirstOrDefaultAsync<T>() => ReadRowAsyncImpl<T>(typeof(T), Row.FirstOrDefault);
+            public Task<T?> ReadFirstOrDefaultAsync<T>() => ReadRowAsyncImpl<T?>(typeof(T), Row.FirstOrDefault);
 
             /// <summary>
             /// Read an individual row of the next grid of results.
@@ -139,7 +131,7 @@ namespace Dapper
             /// Read an individual row of the next grid of results.
             /// </summary>
             /// <typeparam name="T">The type to read.</typeparam>
-            public Task<T> ReadSingleOrDefaultAsync<T>() => ReadRowAsyncImpl<T>(typeof(T), Row.SingleOrDefault);
+            public Task<T?> ReadSingleOrDefaultAsync<T>() => ReadRowAsyncImpl<T?>(typeof(T), Row.SingleOrDefault);
 
             private async Task NextResultAsync()
             {
@@ -162,8 +154,8 @@ namespace Dapper
 #else
                     reader.Dispose();
 #endif
-                    reader = null;
-                    callbacks?.OnCompleted();
+                    reader = null!;
+                    onCompleted?.Invoke(state);
 #if NET5_0_OR_GREATER
                     await DisposeAsync();
 #else
@@ -298,7 +290,7 @@ namespace Dapper
                 {
                     if (!reader.IsClosed) Command?.Cancel();
                     await reader.DisposeAsync();
-                    reader = null;
+                    reader = null!;
                 }
                 if (Command != null)
                 {
@@ -310,7 +302,7 @@ namespace Dapper
                     {
                         Command.Dispose();
                     }
-                    Command = null;
+                    Command = null!;
                 }
                 GC.SuppressFinalize(this);
             }

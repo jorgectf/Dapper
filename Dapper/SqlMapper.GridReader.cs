@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Data;
 using System.Data.Common;
 using System.Globalization;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Threading;
 
 namespace Dapper
 {
@@ -15,18 +17,33 @@ namespace Dapper
         /// </summary>
         public partial class GridReader : IDisposable
         {
-            private DbDataReader? reader;
+            private DbDataReader reader;
             private readonly Identity identity;
             private readonly bool addToCache;
+            private readonly Action<object?>? onCompleted;
+            private readonly object? state;
+            private readonly CancellationToken cancel;
 
-            internal GridReader(IDbCommand command, DbDataReader reader, Identity identity, IParameterCallbacks? callbacks, bool addToCache)
+            /// <summary>
+            /// Creates a grid reader over an existing command and reader
+            /// </summary>
+            [Browsable(false), EditorBrowsable(EditorBrowsableState.Never)]
+            protected GridReader(IDbCommand command, DbDataReader reader, Identity identity, Action<object?>? onCompleted = null, object? state = null, bool addToCache = false, CancellationToken cancellationToken = default)
             {
                 Command = command;
                 this.reader = reader;
                 this.identity = identity;
-                this.callbacks = callbacks;
+                this.onCompleted = onCompleted;
+                this.state = state;
                 this.addToCache = addToCache;
+                this.cancel = cancellationToken;
             }
+
+            internal GridReader(IDbCommand command, DbDataReader reader, Identity identity, IParameterCallbacks? callbacks, bool addToCache,
+                CancellationToken cancellationToken = default)
+                : this(command, reader, identity, callbacks is null ? null : static state => ((IParameterCallbacks)state!).OnCompleted(),
+                      callbacks, addToCache, cancellationToken)
+            { }
 
             /// <summary>
             /// Read the next grid of results, returned as a dynamic object.
@@ -45,7 +62,7 @@ namespace Dapper
             /// Read an individual row of the next grid of results, returned as a dynamic object.
             /// </summary>
             /// <remarks>Note: the row can be accessed via "dynamic", or by casting to an IDictionary&lt;string,object&gt;</remarks>
-            public dynamic ReadFirstOrDefault() => ReadRow<dynamic>(typeof(DapperRow), Row.FirstOrDefault);
+            public dynamic? ReadFirstOrDefault() => ReadRow<dynamic>(typeof(DapperRow), Row.FirstOrDefault);
 
             /// <summary>
             /// Read an individual row of the next grid of results, returned as a dynamic object.
@@ -57,7 +74,7 @@ namespace Dapper
             /// Read an individual row of the next grid of results, returned as a dynamic object.
             /// </summary>
             /// <remarks>Note: the row can be accessed via "dynamic", or by casting to an IDictionary&lt;string,object&gt;</remarks>
-            public dynamic ReadSingleOrDefault() => ReadRow<dynamic>(typeof(DapperRow), Row.SingleOrDefault);
+            public dynamic? ReadSingleOrDefault() => ReadRow<dynamic>(typeof(DapperRow), Row.SingleOrDefault);
 
             /// <summary>
             /// Read the next grid of results.
@@ -76,7 +93,7 @@ namespace Dapper
             /// Read an individual row of the next grid of results.
             /// </summary>
             /// <typeparam name="T">The type to read.</typeparam>
-            public T ReadFirstOrDefault<T>() => ReadRow<T>(typeof(T), Row.FirstOrDefault);
+            public T? ReadFirstOrDefault<T>() => ReadRow<T>(typeof(T), Row.FirstOrDefault);
 
             /// <summary>
             /// Read an individual row of the next grid of results.
@@ -88,7 +105,7 @@ namespace Dapper
             /// Read an individual row of the next grid of results.
             /// </summary>
             /// <typeparam name="T">The type to read.</typeparam>
-            public T ReadSingleOrDefault<T>() => ReadRow<T>(typeof(T), Row.SingleOrDefault);
+            public T? ReadSingleOrDefault<T>() => ReadRow<T>(typeof(T), Row.SingleOrDefault);
 
             /// <summary>
             /// Read the next grid of results.
@@ -118,7 +135,7 @@ namespace Dapper
             /// </summary>
             /// <param name="type">The type to read.</param>
             /// <exception cref="ArgumentNullException"><paramref name="type"/> is <c>null</c>.</exception>
-            public object ReadFirstOrDefault(Type type)
+            public object? ReadFirstOrDefault(Type type)
             {
                 if (type == null) throw new ArgumentNullException(nameof(type));
                 return ReadRow<object>(type, Row.FirstOrDefault);
@@ -140,7 +157,7 @@ namespace Dapper
             /// </summary>
             /// <param name="type">The type to read.</param>
             /// <exception cref="ArgumentNullException"><paramref name="type"/> is <c>null</c>.</exception>
-            public object ReadSingleOrDefault(Type type)
+            public object? ReadSingleOrDefault(Type type)
             {
                 if (type == null) throw new ArgumentNullException(nameof(type));
                 return ReadRow<object>(type, Row.SingleOrDefault);
@@ -371,7 +388,21 @@ namespace Dapper
             }
 
             private int gridIndex; //, readCount;
-            private readonly IParameterCallbacks? callbacks;
+
+            /// <summary>
+            /// Indicates the current result index
+            /// </summary>
+            protected int ResultIndex => gridIndex;
+
+            /// <summary>
+            /// Increments the current result index
+            /// </summary>
+            protected void MarkNextResult() => gridIndex++;
+
+            /// <summary>
+            /// Indicates that all data has been consumed
+            /// </summary>
+            protected void MarkConsumed() => IsConsumed = true;
 
             /// <summary>
             /// Has the underlying reader been consumed?
@@ -381,7 +412,17 @@ namespace Dapper
             /// <summary>
             /// The command associated with the reader
             /// </summary>
-            public IDbCommand? Command { get; set; }
+            public IDbCommand Command { get; set; }
+
+            /// <summary>
+            /// The underlying reader
+            /// </summary>
+            protected DbDataReader Reader => reader;
+
+            /// <summary>
+            /// The cancellation token associated with this reader
+            /// </summary>
+            protected CancellationToken CancellationToken => cancel;
 
             private void NextResult()
             {
@@ -400,8 +441,8 @@ namespace Dapper
                     // happy path; close the reader cleanly - no
                     // need for "Cancel" etc
                     reader.Dispose();
-                    reader = null;
-                    callbacks?.OnCompleted();
+                    reader = null!;
+                    onCompleted?.Invoke(state);
                     Dispose();
                 }
             }
@@ -415,12 +456,12 @@ namespace Dapper
                 {
                     if (!reader.IsClosed) Command?.Cancel();
                     reader.Dispose();
-                    reader = null;
+                    reader = null!;
                 }
                 if (Command != null)
                 {
                     Command.Dispose();
-                    Command = null;
+                    Command = null!;
                 }
                 GC.SuppressFinalize(this);
             }
