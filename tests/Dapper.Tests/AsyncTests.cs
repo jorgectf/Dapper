@@ -120,7 +120,7 @@ namespace Dapper.Tests
             await using (var grid = await connection.QueryMultipleAsync("select 'abc' union select 'def'; select @txt", new { txt = "ghi" })
                 .ConfigureAwait(false))
             {
-                await Assert.ThrowsAnyAsync<OperationCanceledException>(async () =>
+                var ex = await Assert.ThrowsAnyAsync<Exception>(async () =>
                 {
                     while (!grid.IsConsumed)
                     {
@@ -133,6 +133,9 @@ namespace Dapper.Tests
                         cts.Cancel();
                     }
                 });
+                Assert.Equal("Operation cancelled by user.", ex.Message);
+                Assert.True(ex is OperationCanceledException || (ex.Message == "Operation cancelled by user."
+                    && ex.GetType().Name == "SqlException")); // avoid "is SqlException" because 2 providers
             }
             var arr = results.ToArray();
             Assert.Equal(new[] { "abc", "def" }, arr); // don't expect the ghi because of cancellation
@@ -441,7 +444,7 @@ namespace Dapper.Tests
             var count = (await conn.QueryAsync<int>("select count(1) from literal1 where id={=foo}", new { foo = 123 }).ConfigureAwait(false)).Single();
             Assert.Equal(1, count);
             int sum = (await conn.QueryAsync<int>("select sum(id) + sum(foo) from literal1").ConfigureAwait(false)).Single();
-            Assert.Equal(sum, 123 + 456 + 1 + 2 + 3 + 4);
+            Assert.Equal(123 + 456 + 1 + 2 + 3 + 4, sum);
         }
 
         [Fact]

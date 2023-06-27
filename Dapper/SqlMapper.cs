@@ -1927,7 +1927,7 @@ namespace Dapper
             return reader => handler.Parse(type, reader.GetValue(startBound))!;
         }
 
-        private static Exception MultiMapException(IDataRecord reader, string? splitOnColumnName = null)
+        private static Exception MultiMapException(IDataRecord reader, string? splitOn = null)
         {
             bool hasFields = false;
             try { hasFields = reader != null && reader.FieldCount != 0; }
@@ -1935,10 +1935,10 @@ namespace Dapper
             if (hasFields)
             {
                 return new ArgumentException(
-                    string.IsNullOrEmpty(splitOnColumnName)
+                    string.IsNullOrEmpty(splitOn)
                     ? "When using the multi-mapping APIs ensure you set the splitOn param if you have keys other than Id"
-                    : $"Multi-map error: splitOn column '{splitOnColumnName}' was not found - please ensure your splitOn parameter is set and in the correct order", 
-                    "splitOn");
+                    : $"Multi-map error: splitOn column '{splitOn}' was not found - please ensure your splitOn parameter is set and in the correct order", 
+                    nameof(splitOn));
             }
             else
             {
@@ -2467,6 +2467,7 @@ namespace Dapper
             command.CommandText = sql;
         }
 
+        [SuppressMessage("Style", "IDE0220:Add explicit cast", Justification = "Regex matches are Match")]
         internal static IList<LiteralToken> GetLiteralTokens(string sql)
         {
             if (string.IsNullOrEmpty(sql)) return LiteralToken.None;

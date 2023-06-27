@@ -246,8 +246,8 @@ SELECT @since as [Since], @customerCode as [Code]";
                     var a = (DateTime?)row.Since;
                     var b = (string)row.Code;
 
-                    Assert.Equal(a, since);
-                    Assert.Equal(b, code);
+                    Assert.Equal(since, a);
+                    Assert.Equal(code, b);
                 }
             }
         }
@@ -276,8 +276,8 @@ SELECT @since as [Since], @customerCode as [Code]";
                     var a = (DateTime?)row.Since;
                     var b = (string)row.Code;
 
-                    Assert.Equal(a, since);
-                    Assert.Equal(b, code);
+                    Assert.Equal(since, a);
+                    Assert.Equal(code, b);
                 }
             }
         }

@@ -1633,7 +1633,7 @@ create table #Issue1907 (
                         throw new InvalidOperationException($"unexpected reader type: {reader.GetType().FullName}");
                     }
                     Assert.Equal(sentValue, recvValue);
-                    Assert.Equal(recvValue.ToString(), PreciseValue);
+                    Assert.Equal(PreciseValue, recvValue.ToString());
 
                     Assert.False(reader.Read());
                     Assert.False(reader.NextResult());
@@ -1646,7 +1646,7 @@ create table #Issue1907 (
                     Assert.True(reader.Read());
                     recvValue = reader.GetFieldValue<SqlDecimal>(1);
                     Assert.Equal(sentValue, recvValue);
-                    Assert.Equal(recvValue.ToString(), PreciseValue);
+                    Assert.Equal(PreciseValue, recvValue.ToString());
 
                     Assert.False(reader.Read());
                     Assert.False(reader.NextResult());
@@ -1664,29 +1664,29 @@ create table #Issue1907 (
                 // prove that simple read: works
                 recvValue = connection.QuerySingle<SqlDecimal>("select Value from #Issue1907");
                 Assert.Equal(sentValue, recvValue);
-                Assert.Equal(recvValue.ToString(), PreciseValue);
+                Assert.Equal(PreciseValue, recvValue.ToString());
 
                 recvValue = connection.QuerySingle<SqlDecimal?>("select Value from #Issue1907")!.Value;
                 Assert.Equal(sentValue, recvValue);
-                Assert.Equal(recvValue.ToString(), PreciseValue);
+                Assert.Equal(PreciseValue, recvValue.ToString());
 
                 // prove that object read: works
                 recvValue = connection.QuerySingle<HazSqlDecimal>("select Id, Value from #Issue1907").Value;
                 Assert.Equal(sentValue, recvValue);
-                Assert.Equal(recvValue.ToString(), PreciseValue);
+                Assert.Equal(PreciseValue, recvValue.ToString());
 
                 recvValue = connection.QuerySingle<HazNullableSqlDecimal>("select Id, Value from #Issue1907").Value!.Value;
                 Assert.Equal(sentValue, recvValue);
-                Assert.Equal(recvValue.ToString(), PreciseValue);
+                Assert.Equal(PreciseValue, recvValue.ToString());
 
                 // prove that value-tuple read: works
                 recvValue = connection.QuerySingle<(int Id, SqlDecimal Value)>("select Id, Value from #Issue1907").Value;
                 Assert.Equal(sentValue, recvValue);
-                Assert.Equal(recvValue.ToString(), PreciseValue);
+                Assert.Equal(PreciseValue, recvValue.ToString());
 
                 recvValue = connection.QuerySingle<(int Id, SqlDecimal? Value)>("select Id, Value from #Issue1907").Value!.Value;
                 Assert.Equal(sentValue, recvValue);
-                Assert.Equal(recvValue.ToString(), PreciseValue);
+                Assert.Equal(PreciseValue, recvValue.ToString());
             }
             finally
             {

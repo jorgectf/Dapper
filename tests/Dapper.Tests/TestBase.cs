@@ -49,18 +49,24 @@ namespace Dapper.Tests
 
     public abstract class SqlServerDatabaseProvider : DatabaseProvider
     {
-        public override string GetConnectionString() => 
-            GetConnectionString("SqlServerConnectionString", "Data Source=.;Initial Catalog=tempdb;Integrated Security=True");
+        public override string GetConnectionString() => GetConnectionString(false);
+
+        private string GetConnectionString(bool mars)
+        {
+            var builder = Factory.CreateConnectionStringBuilder()!;
+            builder.ConnectionString = GetConnectionString("SqlServerConnectionString", "Data Source=.;Initial Catalog=tempdb;Integrated Security=True");
+            builder["TrustServerCertificate"] = true;
+            if (mars)
+            {
+                ((dynamic)builder).MultipleActiveResultSets = true;
+            }
+            return builder.ConnectionString;
+        }
 
         public DbConnection GetOpenConnection(bool mars)
         {
-            if (!mars) return GetOpenConnection();
-
-            var scsb = Factory.CreateConnectionStringBuilder()!;
-            scsb.ConnectionString = GetConnectionString();
-            ((dynamic)scsb).MultipleActiveResultSets = true;
             var conn = Factory.CreateConnection()!;
-            conn.ConnectionString = scsb.ConnectionString;
+            conn.ConnectionString = GetConnectionString(mars);
             conn.Open();
             if (conn.State != ConnectionState.Open) throw new InvalidOperationException("should be open!");
             return conn;

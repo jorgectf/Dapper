@@ -36,7 +36,7 @@ namespace Dapper
                 this.onCompleted = onCompleted;
                 this.state = state;
                 this.addToCache = addToCache;
-                this.cancel = cancellationToken;
+                cancel = cancellationToken;
             }
 
             internal GridReader(IDbCommand command, DbDataReader reader, Identity identity, IParameterCallbacks? callbacks, bool addToCache,

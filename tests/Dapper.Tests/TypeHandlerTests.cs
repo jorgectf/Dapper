@@ -234,17 +234,17 @@ namespace Dapper.Tests
             var row = connection.Query<LotsOfNumerics>(sql).Single();
 
             Assert.True(row.N_Bool);
-            Assert.Equal(row.N_SByte, (sbyte)1);
-            Assert.Equal(row.N_Byte, (byte)1);
-            Assert.Equal(row.N_Int, (int)1);
-            Assert.Equal(row.N_UInt, (uint)1);
-            Assert.Equal(row.N_Short, (short)1);
-            Assert.Equal(row.N_UShort, (ushort)1);
-            Assert.Equal(row.N_Long, (long)1);
-            Assert.Equal(row.N_ULong, (ulong)1);
-            Assert.Equal(row.N_Float, (float)1);
-            Assert.Equal(row.N_Double, (double)1);
-            Assert.Equal(row.N_Decimal, (decimal)1);
+            Assert.Equal((sbyte)1, row.N_SByte);
+            Assert.Equal((byte)1, row.N_Byte);
+            Assert.Equal((int)1, row.N_Int);
+            Assert.Equal((uint)1, row.N_UInt);
+            Assert.Equal((short)1, row.N_Short);
+            Assert.Equal((ushort)1, row.N_UShort);
+            Assert.Equal((long)1, row.N_Long);
+            Assert.Equal((ulong)1, row.N_ULong);
+            Assert.Equal((float)1, row.N_Float);
+            Assert.Equal((double)1, row.N_Double);
+            Assert.Equal((decimal)1, row.N_Decimal);
 
             Assert.Equal(LotsOfNumerics.E_Byte.B, row.P_Byte);
             Assert.Equal(LotsOfNumerics.E_SByte.B, row.P_SByte);
@@ -256,17 +256,17 @@ namespace Dapper.Tests
             Assert.Equal(LotsOfNumerics.E_ULong.B, row.P_ULong);
 
             Assert.True(row.N_N_Bool!.Value);
-            Assert.Equal(row.N_N_SByte!.Value, (sbyte)1);
-            Assert.Equal(row.N_N_Byte!.Value, (byte)1);
-            Assert.Equal(row.N_N_Int!.Value, (int)1);
-            Assert.Equal(row.N_N_UInt!.Value, (uint)1);
-            Assert.Equal(row.N_N_Short!.Value, (short)1);
-            Assert.Equal(row.N_N_UShort!.Value, (ushort)1);
-            Assert.Equal(row.N_N_Long!.Value, (long)1);
-            Assert.Equal(row.N_N_ULong!.Value, (ulong)1);
-            Assert.Equal(row.N_N_Float!.Value, (float)1);
-            Assert.Equal(row.N_N_Double!.Value, (double)1);
-            Assert.Equal(row.N_N_Decimal, (decimal)1);
+            Assert.Equal((sbyte)1, row.N_N_SByte!.Value);
+            Assert.Equal((byte)1, row.N_N_Byte!.Value);
+            Assert.Equal((int)1, row.N_N_Int!.Value);
+            Assert.Equal((uint)1, row.N_N_UInt!.Value);
+            Assert.Equal((short)1, row.N_N_Short!.Value);
+            Assert.Equal((ushort)1, row.N_N_UShort!.Value);
+            Assert.Equal((long)1, row.N_N_Long!.Value);
+            Assert.Equal((ulong)1, row.N_N_ULong!.Value);
+            Assert.Equal((float)1, row.N_N_Float!.Value);
+            Assert.Equal((double)1, row.N_N_Double!.Value);
+            Assert.Equal((decimal)1, row.N_N_Decimal);
 
             Assert.Equal(LotsOfNumerics.E_Byte.B, row.N_P_Byte!.Value);
             Assert.Equal(LotsOfNumerics.E_SByte.B, row.N_P_SByte!.Value);
@@ -455,7 +455,7 @@ namespace Dapper.Tests
             SqlMapper.ResetTypeHandlers();
             SqlMapper.AddTypeHandler(StringListTypeHandler.Default);
             var foo = connection.Query<MyObjectWithStringList>("SELECT 'Sam,Kyro' AS Names").Single();
-            Assert.Equal(new[] { "Sam", "Kyro" }, foo.Names);
+            Assert.Equal(new[] { "Sam", "Kyro" }, foo.Names!);
         }
 
         [Fact]
@@ -470,7 +470,7 @@ namespace Dapper.Tests
                 const string names = "Sam,Kyro";
                 List<string> names_list = names.Split(',').ToList();
                 var foo = connection.Query<string>("INSERT INTO #Issue253 (Names) VALUES (@Names); SELECT Names FROM #Issue253;", new { Names = names_list }).Single();
-                Assert.Equal(foo, names);
+                Assert.Equal(names, foo);
             }
             finally
             {

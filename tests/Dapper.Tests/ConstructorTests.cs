@@ -59,9 +59,9 @@ namespace Dapper.Tests
             const char c1 = 'ą';
             const char c3 = 'ó';
             NoDefaultConstructorWithChar nodef = connection.Query<NoDefaultConstructorWithChar>("select @c1 c1, @c2 c2, @c3 c3", new { c1 = c1, c2 = (char?)null, c3 = c3 }).First();
-            Assert.Equal(nodef.Char1, c1);
+            Assert.Equal(c1, nodef.Char1);
             Assert.Null(nodef.Char2);
-            Assert.Equal(nodef.Char3, c3);
+            Assert.Equal(c3, nodef.Char3);
         }
 
         [Fact]

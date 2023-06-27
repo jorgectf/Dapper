@@ -384,7 +384,7 @@ namespace Dapper
                 diving = diving?.Expression as MemberExpression;
 #pragma warning restore IDE0019 // use pattern matching
 
-                if (constant is object && constant.Type == typeof(T))
+                if (constant is not null && constant.Type == typeof(T))
                 {
                     break;
                 }
