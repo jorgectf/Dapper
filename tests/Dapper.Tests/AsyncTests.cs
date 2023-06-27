@@ -133,9 +133,7 @@ namespace Dapper.Tests
                         cts.Cancel();
                     }
                 });
-                Assert.Equal("Operation cancelled by user.", ex.Message);
-                Assert.True(ex is OperationCanceledException || (ex.Message == "Operation cancelled by user."
-                    && ex.GetType().Name == "SqlException")); // avoid "is SqlException" because 2 providers
+                Assert.True(ex is OperationCanceledException or DbException { Message: "Operation cancelled by user." });
             }
             var arr = results.ToArray();
             Assert.Equal(new[] { "abc", "def" }, arr); // don't expect the ghi because of cancellation
