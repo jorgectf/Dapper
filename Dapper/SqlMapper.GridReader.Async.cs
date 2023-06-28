@@ -133,17 +133,23 @@ namespace Dapper
             /// <typeparam name="T">The type to read.</typeparam>
             public Task<T?> ReadSingleOrDefaultAsync<T>() => ReadRowAsyncImpl<T?>(typeof(T), Row.SingleOrDefault);
 
-            private async Task NextResultAsync()
+            /// <summary>
+            /// Marks the current grid as consumed, and moves to the next result
+            /// </summary>
+            protected async Task OnAfterGridAsync(int index)
             {
-                if (reader is null)
+                if (index != ResultIndex)
+                {
+                    // not our data
+                }
+                else if (reader is null)
                 {
                     // nothing to do
                 }
                 else if (await reader.NextResultAsync(cancel).ConfigureAwait(false))
                 {
                     // readCount++;
-                    gridIndex++;
-                    IsConsumed = false;
+                    _resultIndexAndConsumedFlag = index + 1;
                 }
                 else
                 {
@@ -166,24 +172,23 @@ namespace Dapper
 
             private Task<IEnumerable<T>> ReadAsyncImpl<T>(Type type, bool buffered)
             {
-                var deserializer = ValidateAndMarkConsumed(type);
+                var deserializer = ValidateAndMarkConsumed(type, out var index);
                 if (buffered)
                 {
-                    return ReadBufferedAsync<T>(gridIndex, deserializer);
+                    return ReadBufferedAsync<T>(index, deserializer);
                 }
                 else
                 {
-                    var result = ReadDeferred<T>(gridIndex, deserializer, type);
+                    var result = ReadDeferred<T>(index, deserializer, type);
                     if (buffered) result = result.ToList(); // for the "not a DbDataReader" scenario
                     return Task.FromResult(result);
                 }
             }
 
-            private Func<DbDataReader, object> ValidateAndMarkConsumed(Type type)
+            private Func<DbDataReader, object> ValidateAndMarkConsumed(Type type, out int index)
             {
-                if (reader == null) throw new ObjectDisposedException(GetType().FullName, "The reader has been disposed; this can happen after all data has been consumed");
-                if (IsConsumed) throw new InvalidOperationException("Query results must be consumed in the correct order, and each result can only be consumed once");
-                var typedIdentity = identity.ForGrid(type, gridIndex);
+                index = OnBeforeGrid();
+                var typedIdentity = identity.ForGrid(type, index);
                 CacheInfo cache = GetCacheInfo(typedIdentity, null, addToCache);
                 var deserializer = cache.Deserializer;
 
@@ -193,20 +198,17 @@ namespace Dapper
                     deserializer = new DeserializerState(hash, GetDeserializer(type, reader, 0, -1, false));
                     cache.Deserializer = deserializer;
                 }
-                IsConsumed = true;
                 return deserializer.Func;
             }
 
             private async Task<T> ReadRowAsyncImpl<T>(Type type, Row row)
             {
-                if (reader == null) throw new ObjectDisposedException(GetType().FullName, "The reader has been disposed; this can happen after all data has been consumed");
-                if (IsConsumed) throw new InvalidOperationException("Query results must be consumed in the correct order, and each result can only be consumed once");
+                var index = OnBeforeGrid();
 
-                IsConsumed = true;
                 T result = default!;
                 if (await reader.ReadAsync(cancel).ConfigureAwait(false) && reader.FieldCount != 0)
                 {
-                    var typedIdentity = identity.ForGrid(type, gridIndex);
+                    var typedIdentity = identity.ForGrid(type, index);
                     CacheInfo cache = GetCacheInfo(typedIdentity, null, addToCache);
                     var deserializer = cache.Deserializer;
 
@@ -226,7 +228,7 @@ namespace Dapper
                 {
                     ThrowZeroRows(row);
                 }
-                await NextResultAsync().ConfigureAwait(false);
+                await OnAfterGridAsync(index).ConfigureAwait(false);
                 return result;
             }
 
@@ -235,7 +237,7 @@ namespace Dapper
                 try
                 {
                     var buffer = new List<T>();
-                    while (index == gridIndex && await reader!.ReadAsync(cancel).ConfigureAwait(false))
+                    while (index == ResultIndex && await reader!.ReadAsync(cancel).ConfigureAwait(false))
                     {
                         buffer.Add(ConvertTo<T>(deserializer(reader)));
                     }
@@ -243,10 +245,7 @@ namespace Dapper
                 }
                 finally // finally so that First etc progresses things even when multiple rows
                 {
-                    if (index == gridIndex)
-                    {
-                        await NextResultAsync().ConfigureAwait(false);
-                    }
+                    await OnAfterGridAsync(index).ConfigureAwait(false);
                 }
             }
 
@@ -259,25 +258,22 @@ namespace Dapper
 
             private IAsyncEnumerable<T> ReadAsyncUnbufferedImpl<T>(Type type)
             {
-                var deserializer = ValidateAndMarkConsumed(type);
-                return ReadUnbufferedAsync<T>(gridIndex, deserializer, cancel);
+                var deserializer = ValidateAndMarkConsumed(type, out var index);
+                return ReadUnbufferedAsync<T>(index, deserializer, cancel);
             }
 
             private async IAsyncEnumerable<T> ReadUnbufferedAsync<T>(int index, Func<DbDataReader, object> deserializer, [EnumeratorCancellation] CancellationToken cancel)
             {
                 try
                 {
-                    while (index == gridIndex && await reader!.ReadAsync(cancel).ConfigureAwait(false))
+                    while (index == ResultIndex && await reader!.ReadAsync(cancel).ConfigureAwait(false))
                     {
                         yield return ConvertTo<T>(deserializer(reader));
                     }
                 }
                 finally // finally so that First etc progresses things even when multiple rows
                 {
-                    if (index == gridIndex)
-                    {
-                        await NextResultAsync().ConfigureAwait(false);
-                    }
+                    await OnAfterGridAsync(index).ConfigureAwait(false);
                 }
             }
 

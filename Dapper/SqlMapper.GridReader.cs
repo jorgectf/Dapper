@@ -163,11 +163,23 @@ namespace Dapper
                 return ReadRow<object>(type, Row.SingleOrDefault);
             }
 
-            private IEnumerable<T> ReadImpl<T>(Type type, bool buffered)
+
+            /// <summary>
+            /// Validates that data is available, returning the <see cref="ResultIndex"/> that corresponds to the current grid - and marks the current grid as consumed;
+            /// this call <em>must</em> be paired with a call to <see cref="OnAfterGrid(int)"/> or <see cref="OnAfterGridAsync(int)"/>
+            /// </summary>
+            protected int OnBeforeGrid()
             {
                 if (reader == null) throw new ObjectDisposedException(GetType().FullName, "The reader has been disposed; this can happen after all data has been consumed");
                 if (IsConsumed) throw new InvalidOperationException("Query results must be consumed in the correct order, and each result can only be consumed once");
-                var typedIdentity = identity.ForGrid(type, gridIndex);
+                _resultIndexAndConsumedFlag |= CONSUMED_FLAG;
+                return ResultIndex;
+            }
+
+            private IEnumerable<T> ReadImpl<T>(Type type, bool buffered)
+            {
+                var index = OnBeforeGrid();
+                var typedIdentity = identity.ForGrid(type, index);
                 CacheInfo cache = GetCacheInfo(typedIdentity, null, addToCache);
                 var deserializer = cache.Deserializer;
 
@@ -177,21 +189,18 @@ namespace Dapper
                     deserializer = new DeserializerState(hash, GetDeserializer(type, reader, 0, -1, false));
                     cache.Deserializer = deserializer;
                 }
-                IsConsumed = true;
-                var result = ReadDeferred<T>(gridIndex, deserializer.Func, type);
+                var result = ReadDeferred<T>(index, deserializer.Func, type);
                 return buffered ? result.ToList() : result;
             }
 
             private T ReadRow<T>(Type type, Row row)
             {
-                if (reader == null) throw new ObjectDisposedException(GetType().FullName, "The reader has been disposed; this can happen after all data has been consumed");
-                if (IsConsumed) throw new InvalidOperationException("Query results must be consumed in the correct order, and each result can only be consumed once");
-                IsConsumed = true;
+                var index = OnBeforeGrid();
 
                 T result = default!;
                 if (reader.Read() && reader.FieldCount != 0)
                 {
-                    var typedIdentity = identity.ForGrid(type, gridIndex);
+                    var typedIdentity = identity.ForGrid(type, index);
                     CacheInfo cache = GetCacheInfo(typedIdentity, null, addToCache);
                     var deserializer = cache.Deserializer;
 
@@ -211,15 +220,14 @@ namespace Dapper
                 {
                     ThrowZeroRows(row);
                 }
-                NextResult();
+                OnAfterGrid(index);
                 return result;
             }
 
             private IEnumerable<TReturn> MultiReadInternal<TFirst, TSecond, TThird, TFourth, TFifth, TSixth, TSeventh, TReturn>(Delegate func, string splitOn)
             {
-                var identity = this.identity.ForGrid<TFirst, TSecond, TThird, TFourth, TFifth, TSixth, TSeventh>(typeof(TReturn), gridIndex);
-
-                IsConsumed = true;
+                var index = OnBeforeGrid();
+                var identity = this.identity.ForGrid<TFirst, TSecond, TThird, TFourth, TFifth, TSixth, TSeventh>(typeof(TReturn), index);
 
                 try
                 {
@@ -230,13 +238,14 @@ namespace Dapper
                 }
                 finally
                 {
-                    NextResult();
+                    OnAfterGrid(index);
                 }
             }
 
             private IEnumerable<TReturn> MultiReadInternal<TReturn>(Type[] types, Func<object[], TReturn> map, string splitOn)
             {
-                var identity = this.identity.ForGrid(typeof(TReturn), types, gridIndex);
+                var index = OnBeforeGrid();
+                var identity = this.identity.ForGrid(typeof(TReturn), types, index);
                 try
                 {
                     foreach (var r in MultiMapImpl<TReturn>(null, default, types, map, splitOn, reader, identity, false))
@@ -246,7 +255,7 @@ namespace Dapper
                 }
                 finally
                 {
-                    NextResult();
+                    OnAfterGrid(index);
                 }
             }
 
@@ -373,41 +382,30 @@ namespace Dapper
             {
                 try
                 {
-                    while (index == gridIndex && reader?.Read() == true)
+                    while (index == ResultIndex && reader?.Read() == true)
                     {
                         yield return ConvertTo<T>(deserializer(reader));
                     }
                 }
                 finally // finally so that First etc progresses things even when multiple rows
                 {
-                    if (index == gridIndex)
-                    {
-                        NextResult();
-                    }
+                    OnAfterGrid(index);
                 }
             }
 
-            private int gridIndex; //, readCount;
+            const int CONSUMED_FLAG = 1 << 31;
+            private int _resultIndexAndConsumedFlag; //, readCount;
 
             /// <summary>
             /// Indicates the current result index
             /// </summary>
-            protected int ResultIndex => gridIndex;
-
-            /// <summary>
-            /// Increments the current result index
-            /// </summary>
-            protected void MarkNextResult() => gridIndex++;
-
-            /// <summary>
-            /// Indicates that all data has been consumed
-            /// </summary>
-            protected void MarkConsumed() => IsConsumed = true;
+            protected int ResultIndex => _resultIndexAndConsumedFlag & ~CONSUMED_FLAG;
 
             /// <summary>
             /// Has the underlying reader been consumed?
             /// </summary>
-            public bool IsConsumed { get; private set; }
+            /// <remarks>This also reports <c>true</c> if the current grid is actively being consumed</remarks>
+            public bool IsConsumed => (_resultIndexAndConsumedFlag & CONSUMED_FLAG) != 0;
 
             /// <summary>
             /// The command associated with the reader
@@ -424,17 +422,23 @@ namespace Dapper
             /// </summary>
             protected CancellationToken CancellationToken => cancel;
 
-            private void NextResult()
+            /// <summary>
+            /// Marks the current grid as consumed, and moves to the next result
+            /// </summary>
+            protected void OnAfterGrid(int index)
             {
-                if (reader is null)
+                if (index != ResultIndex)
+                {
+                    // not our data!
+                }
+                else if (reader is null)
                 {
                     // nothing to do
                 }
                 else if (reader.NextResult())
                 {
                     // readCount++;
-                    gridIndex++;
-                    IsConsumed = false;
+                    _resultIndexAndConsumedFlag = index + 1;
                 }
                 else
                 {
